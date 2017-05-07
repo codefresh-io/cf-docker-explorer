@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Docker Explorer</title>
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
+    <script src="https://unpkg.com/lodash@4.17.4/lodash.min.js"></script>
+    <script src="https://unpkg.com/kefir@3.7.1/dist/kefir.min.js"></script>
+    <script src="https://unpkg.com/moment@2.18.1/min/moment.min.js"></script>
+    <script src="https://unpkg.com/react@15.3.1/dist/react.js"></script>
+    <script src="https://unpkg.com/react-dom@15.3.1/dist/react-dom.min.js"></script>
+    <link rel="stylesheet" href="index.css"/>
+</head>
+<body>
+    <main/>
+    <script>
+
+        const [table, thead, tbody, tr, th, td, div, span, ul, li, h1] = ["table", "thead", "tbody", "tr", "th", "td", "div", "span", "ul", "li", "h1"].map((elementName)=> (templateChildren = [], properties = {}, children = [])=> React.createElement(elementName, properties, children, ..._.flatten([templateChildren])));
+
+        let
+            uiBus = Kefir.pool(),
+            sendUiMessage = (message)=> uiBus.plug(Kefir.constant(message)),
+            source = new EventSource('/beacon');
+
+        let
+            containerProperty = Kefir.fromEvents(source, 'container', ({ data })=> data).toProperty().map(JSON.parse),
+            swarmInfoProperty = Kefir.combine(["is_swarm", "swarm", "node"].map((eventName)=> Kefir.fromEvents(source, eventName).map(_.property('data')).map(JSON.parse)));
+
+        // Node table
+        let swarmInfoHtmlProperty = (function(){
+
+            const NODE_ORDER = {
+                "create.desc":  _.partial(_.orderBy, _, [_.flow(_.property('Create'), (s)=> (new Date(s)).getTime())], ["desc"]),
+                "create.asc":  _.partial(_.orderBy, _, [_.flow(_.property('Create'), (s)=> (new Date(s)).getTime())], ["asc"]),
+                "hostname.desc": _.partial(_.orderBy, _, ["Description.Hostname"], ["desc"]),
+                "hostname.asc": _.partial(_.orderBy, _, ["Description.Hostname"], ["asc"]),
+                "state.desc": _.partial(_.orderBy, _, ["Status.State"], ["desc"]),
+                "state.asc": _.partial(_.orderBy, _, ["Status.State"], ["asc"]),
+                "version.asc": _.partial(_.orderBy, _, ["Engine.EngineVersion"], ["asc"]),
+                "version.desc": _.partial(_.orderBy, _, ["Engine.EngineVersion"], ["desc"]),
+                "id.asc": _.partial(_.orderBy, _, ["ID"], ["asc"]),
+                "id.desc": _.partial(_.orderBy, _, ["ID"], ["desc"]),
+            };
+
+            let nodeOrderProperty = uiBus
+                .filter(_.matches({ "type": "order_node" }))
+                .map(_.property('column'))
+                .scan((current, nextColumn)=> {
+                    let [currentColumn, currentOrder] = current.split('.');
+                    return [nextColumn, currentColumn === nextColumn ? (currentOrder === "asc" ? "desc" : "asc") : "desc"].join('.');
+                }, 'state.desc')
+                .toProperty();
+
+            return swarmInfoProperty
+                .map(([,, node])=> node)
+                .combine(nodeOrderProperty, (array, orderName)=> (NODE_ORDER[orderName] || _.identity)(array))
+                .combine(swarmInfoProperty)
+                .map(([node, [isSwarm, { ID, UpdatedAt, Spec: { Name } = {} } = {}]])=> {
+                    return isSwarm ? div([
+                        ul([
+                            li([span('ID'), span(ID)]),
+                            li([span('Created'), span(moment(UpdatedAt).fromNow(), { title: moment(UpdatedAt).format('DD/MM/YYYY HH:MM') })]),
+                            li([span('Name'), span(Name)])
+                        ], { className: "swarm" }),
+                        table([
+                            thead([
+                                tr(
+                                    th("Nodes", { colSpan: 6, className: "header" })
+                                ),
+                                tr([
+                                    th(["Id"], { className: "sortable", onClick: ()=> sendUiMessage({ "type": "order_node", "column": "id" }) }),
+                                    th(["Hostname"], { className: "sortable", onClick: ()=> sendUiMessage({ "type": "order_node", "column": "hostname" }) }),
+                                    th(["Role"], { onClick: ()=> sendUiMessage({ "type": "order_node", "column": "role" }) }),
+                                    th(["Created"], { className: "sortable", onClick: ()=> sendUiMessage({ "type": "order_node", "column": "create" }) }),
+                                    th(["State"], { className: "sortable", onClick: ()=> sendUiMessage({ "type": "order_node", "column": "state" }) }),
+                                    th(["Ver"], { className: "sortable", onClick: ()=> sendUiMessage({ "type": "order_node", "column": "version" }) })
+                                ])
+                            ]),
+                            tbody([], {}, node.map(({ ID, CreatedAt, Spec: { Role }, Status: { State }, Description: { Hostname, Engine: { EngineVersion } } })=> {
+                                return tr([
+                                    td(span(ID), {className: "id"}),
+                                    td(Hostname),
+                                    td(Role),
+                                    td(moment(CreatedAt).fromNow(), { className: "created", title: moment(CreatedAt).format('DD/MM/YYYY HH:MM') }),
+                                    td(State),
+                                    td(EngineVersion),
+                                ], { key: ID })
+                            }))
+                        ], { className: "node" })
+                    ]) : div('This engine doesn\'t manage a swarm');
+                });
+        })();
+
+        // Container table
+        let containerTableProperty = (function(){
+            const CONTAINER_ORDER = {
+                "state.desc":  _.partial(_.orderBy, _, ["State"], ["desc"]),
+                "state.asc":  _.partial(_.orderBy, _, ["State"], ["asc"]),
+                "create.desc":  _.partial(_.orderBy, _, ["Created"], ["desc"]),
+                "create.asc":  _.partial(_.orderBy, _, ["Created"], ["asc"]),
+                "id.desc":  _.partial(_.orderBy, _, ["Id"], ["desc"]),
+                "id.asc":  _.partial(_.orderBy, _, ["Id"], ["asc"])
+            };
+
+            let containerOrderProperty = uiBus
+                    .filter(_.matches({ "type": "order_container" }))
+                    .map(_.property('column'))
+                    .scan((current, nextColumn)=> {
+                        let [currentColumn, currentOrder] = current.split('.');
+                        return [nextColumn, currentColumn === nextColumn ? (currentOrder === "asc" ? "desc" : "asc") : "desc"].join('.');
+                    }, 'id.desc')
+                    .toProperty();
+
+            return containerProperty
+                .combine(containerOrderProperty, (array, orderName)=> (CONTAINER_ORDER[orderName] || _.identity)(array))
+                .map(function(container){
+                    return table([
+                        thead([
+                            tr(
+                                th("Containers", { colSpan: 5, className: "header" })
+                            ),
+                            tr([
+                                th(["Id"], { className: "sortable", onClick: ()=> sendUiMessage({ "type": "order_container", "column": "id" }) }),
+                                th(["Name(s)"]),
+                                th(["Image"]),
+                                th(["Created"], { className: "sortable", onClick: ()=> sendUiMessage({ "type": "order_container", "column": "create" }) }),
+                                th(["State"], { className: "sortable", onClick: ()=> sendUiMessage({ "type": "order_container", "column": "state" }) }),
+                            ])
+                        ]),
+                        tbody([], {}, container.length ? container.map(({ Id, Names, Created, State, Image })=>
+                            tr([
+                                td(span(Id), { className: "id" }),
+                                td(Names.map(_.unary(span)), { className: "names" }),
+                                td(Image, { className: "image" }),
+                                td(moment(Created * 1000).fromNow(), { className: "created" }),
+                                td(State, { className: "state" }),
+                            ], { key: Id })
+                        ) : tr(td('No containers found', { colSpan: 5 })))
+                    ], { className: "container" });
+                });
+        })();
+
+        Kefir
+            .combine([containerTableProperty, swarmInfoHtmlProperty])
+            .onValue(([containerTable, swarmInfo])=> ReactDOM.render(
+                div([
+                    div([h1('Swarm'), swarmInfo]),
+                    div([h1('Containers'), containerTable])
+                ])
+            , document.querySelector('main')));
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+html {
+    height: 100%;
+}
+
+body {
+    font-family: 'Open Sans', sans-serif;
+    text-align: center;
+    padding: 0;
+    margin: 0;
+    height: 100%;
+    background-color: #eee;
+}
+
+ul {
+    list-style: none;
+}
+
+ul, li {
+    padding: 0;
+    margin: 0;
+}
+
+main {
+    width: 980px;
+    margin: auto;
+    text-align: left;
+    padding: 2rem;
+    background-color: #fff;
+    min-height: 100%;
+    box-sizing: border-box;
+}
+
+table th {
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: bold;
+    text-transform: uppercase;
+
+}
+
+table th.sortable {
+    cursor: pointer;
+}
+
+table td, th {
+    padding: 0.4rem;
+}
+
+table th.header {
+    background-color: #333;
+    color: #eee;
+    vertical-align: text-top;
+    padding: 0.5rem;
+}
+
+table {
+    text-align: left;
+    border: solid 1px #eee;
+    color: #333;
+}
+
+table tbody tr:nth-child(odd) td {
+    background-color: #eee;
+}
+
+table.container td.id span {
+    font-family: Arial;
+    font-weight: bold;
+    font-size: 0.6rem;
+    display: inline-block;
+    border-radius: 2px;
+    color: #888;
+    width: 3rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+}
+
+table.container td.names span {
+    font-weight: bold;
+    font-size: 0.6rem;
+    display: inline-block;
+    border-radius: 2px;
+    background-color: #888;
+    color: #eee;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    padding: 3px;
+    vertical-align: middle;
+}
+
+ul.swarm > li > span:first-child {
+    display: inline-block;
+    width: 5rem;
+}
+
+ul.swarm > li > span:first-child::after {
+    content: ": ";
+}

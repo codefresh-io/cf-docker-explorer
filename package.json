@@ -1,0 +1,18 @@
+{
+  "name": "cf-repo-explorer",
+  "version": "1.0.0",
+  "description": "Explore Docker Engine Instances",
+  "main": "index.js",
+  "dependencies": {
+    "express": "^4.15.2",
+    "kefir": "^3.7.1",
+    "lodash": "^4.17.4",
+    "minimist": "^1.2.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Tal Weinfeld",
+  "license": "ISC"
+}
